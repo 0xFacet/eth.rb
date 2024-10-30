@@ -167,7 +167,7 @@ module Eth
       # Properly encodes byte-strings.
       def bytes(arg, type)
         raise EncodingError, "Expecting String: #{arg}" unless arg.instance_of? String
-        arg = handle_hex_string arg, type
+        arg = arg.b
 
         if type.sub_type.empty?
           size = Util.zpad_int arg.size
@@ -279,20 +279,6 @@ module Eth
           Util.zpad_hex arg[2..-1]
         else
           raise EncodingError, "Could not parse address: #{arg}"
-        end
-      end
-
-      # The ABI encoder needs to be able to determine between a hex `"123"`
-      # and a binary `"123"` string.
-      def handle_hex_string(arg, type)
-        if (arg.size === type.sub_type.to_i * 2 and Util.hex? arg)
-          # There is no way telling whether a string is hex or binary with certainty
-          # in Ruby.
-          Util.hex_to_bin arg
-        else
-
-          # Everything else will be assumed binary or raw string.
-          arg.b
         end
       end
     end
