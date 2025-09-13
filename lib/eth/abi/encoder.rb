@@ -34,7 +34,6 @@ module Eth
       def type(type, arg)
         if %w(string bytes).include? type.base_type and type.sub_type.empty? and type.dimensions.empty?
           raise EncodingError, "Argument must be a String" unless arg.instance_of? String
-          arg = handle_hex_string arg, type
 
           # encodes strings and bytes
           size = type Type.size_type, arg.size
