@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ module Eth
     attr_accessor :key
     attr_accessor :gas_limit, :gas_price, :max_fee_per_gas, :max_priority_fee_per_gas, :nonce
     attr_accessor :bin, :name, :abi, :class_object
-    attr_accessor :events, :functions, :constructor_inputs
+    attr_accessor :events, :functions, :constructor_inputs, :errors
 
     # Constructor of the {Eth::Contract} class.
     #
@@ -44,7 +44,7 @@ module Eth
       @name = _name
       @bin = bin
       @abi = abi
-      @constructor_inputs, @functions, @events = parse_abi(abi)
+      @constructor_inputs, @functions, @events, @errors = parse_abi(abi)
     end
 
     # Creates a contract wrapper from a Solidity file.
@@ -106,6 +106,52 @@ module Eth
       end
     end
 
+    # Finds a function by name.
+    #
+    # @param name [String] function name.
+    # @param args [Integer, nil] number of arguments of a function.
+    # @return [Eth::Contract::Function] function object.
+    # @raise [ArgumentError] if function not found.
+    def function(name, args: nil)
+      functions.find do |f|
+        f.name == name && (args.nil? || args == f.inputs.size)
+      end || raise(ArgumentError, "this function does not exist!")
+    end
+
+    # Finds an error by name.
+    #
+    # @param name [String] error name.
+    # @param args [Integer, nil] number of arguments of an error.
+    # @return [Eth::Contract::Error] error object.
+    # @raise [ArgumentError] if error not found.
+    def error(name, args: nil)
+      errors.find do |e|
+        e.name == name && (args.nil? || args == e.inputs.size)
+      end || raise(ArgumentError, "this error does not exist!")
+    end
+
+    # Decodes a custom error returned by an RPC error using the contract ABI.
+    #
+    # @param rpc_error [RpcError] the RPC error containing revert data.
+    # @return [String] a human readable error message.
+    def decode_error(rpc_error)
+      data = rpc_error.data
+      return rpc_error.message if data.nil? || errors.nil?
+
+      signature = data[0, 10]
+      if (err = errors.find { |e| e.signature == signature })
+        values = err.decode(data)
+        args = values&.map { |v| v.is_a?(String) ? v : v.inspect }&.join(",")
+        args ||= ""
+        "execution reverted: #{err.name}(#{args})"
+      elsif signature == "0x08c379a0"
+        reason = Abi.decode(["string"], "0x" + data[10..])&.first
+        "execution reverted: #{reason}"
+      else
+        rpc_error.message
+      end
+    end
+
     # Create meta classes for smart contracts.
     def build
       class_name = @name
@@ -116,9 +162,12 @@ module Eth
         def_delegators :parent, :name, :abi, :bin
         def_delegators :parent, :gas_limit, :gas_price, :gas_limit=, :gas_price=, :nonce, :nonce=
         def_delegators :parent, :max_fee_per_gas, :max_fee_per_gas=, :max_priority_fee_per_gas, :max_priority_fee_per_gas=
-        def_delegators :parent, :events
+        def_delegators :parent, :events, :errors
         def_delegators :parent, :address, :address=
         def_delegator :parent, :functions
+        def_delegator :parent, :function
+        def_delegator :parent, :error
+        def_delegator :parent, :decode_error
         def_delegator :parent, :constructor_inputs
         define_method :parent do
           parent
@@ -140,7 +189,8 @@ module Eth
       end
       functions = abi.select { |x| x["type"] == "function" }.map { |fun| Eth::Contract::Function.new(fun) }
       events = abi.select { |x| x["type"] == "event" }.map { |evt| Eth::Contract::Event.new(evt) }
-      [constructor_inputs, functions, events]
+      errors = abi.select { |x| x["type"] == "error" }.map { |err| Eth::Contract::Error.new(err) }
+      [constructor_inputs, functions, events, errors]
     end
   end
 end
@@ -151,3 +201,4 @@ require "eth/contract/function"
 require "eth/contract/function_input"
 require "eth/contract/function_output"
 require "eth/contract/initializer"
+require "eth/contract/error"

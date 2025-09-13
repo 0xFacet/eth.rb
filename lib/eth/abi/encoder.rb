@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # -*- encoding : ascii-8bit -*-
+require "bigdecimal"
 
 # Provides the {Eth} module.
 module Eth
@@ -33,6 +34,7 @@ module Eth
       def type(type, arg)
         if %w(string bytes).include? type.base_type and type.sub_type.empty? and type.dimensions.empty?
           raise EncodingError, "Argument must be a String" unless arg.instance_of? String
+          arg = handle_hex_string arg, type
 
           # encodes strings and bytes
           size = type Type.size_type, arg.size
@@ -43,36 +45,24 @@ module Eth
           result += struct_offsets(type.nested_sub, arg)
           result += arg.map { |x| type(type.nested_sub, x) }.join
           result
-        elsif type.dynamic? && arg.is_a?(Array)
+        elsif type.dynamic? && !type.dimensions.empty? && arg.is_a?(Array)
 
           # encodes dynamic-sized arrays
-          head, tail = "", ""
-          head += type(Type.size_type, arg.size)
+          head = type(Type.size_type, arg.size)
           nested_sub = type.nested_sub
-          nested_sub_size = type.nested_sub.size
 
-          # calculate offsets
-          if %w(string bytes).include?(type.base_type) && type.sub_type.empty?
-            offset = 0
-            arg.size.times do |i|
-              if i == 0
-                offset = arg.size * 32
-              else
-                number_of_words = ((arg[i - 1].size + 32 - 1) / 32).floor
-                total_bytes_length = number_of_words * 32
-                offset += total_bytes_length + 32
-              end
-
+          if nested_sub.dynamic?
+            tails = arg.map { |a| type(nested_sub, a) }
+            offset = arg.size * 32
+            tails.each do |t|
               head += type(Type.size_type, offset)
+              offset += t.size
             end
-          elsif nested_sub.base_type == "tuple" && nested_sub.dynamic?
-            head += struct_offsets(nested_sub, arg)
+            head + tails.join
+          else
+            arg.each { |a| head += type(nested_sub, a) }
+            head
           end
-
-          arg.size.times do |i|
-            head += type nested_sub, arg[i]
-          end
-          "#{head}#{tail}"
         else
           if type.dimensions.empty?
 
@@ -93,15 +83,15 @@ module Eth
       # @return [String] the encoded primitive type.
       # @raise [EncodingError] if value does not match type.
       # @raise [ValueOutOfBounds] if value is out of bounds for type.
-      # @raise [EncodingError] if encoding fails for type.
+      # @raise [ArgumentError] if encoding fails for type.
       def primitive_type(type, arg)
         case type.base_type
         when "uint"
           uint arg, type
-        when "bool"
-          bool arg
         when "int"
           int arg, type
+        when "bool"
+          bool arg
         when "ureal", "ufixed"
           ufixed arg, type
         when "real", "fixed"
@@ -123,6 +113,7 @@ module Eth
 
       # Properly encodes unsigned integers.
       def uint(arg, type)
+        arg = coerce_number arg
         raise ArgumentError, "Don't know how to handle this input." unless arg.is_a? Numeric
         raise ValueOutOfBounds, "Number out of range: #{arg}" if arg > Constant::UINT_MAX or arg < Constant::UINT_MIN
         real_size = type.sub_type.to_i
@@ -133,6 +124,7 @@ module Eth
 
       # Properly encodes signed integers.
       def int(arg, type)
+        arg = coerce_number arg
         raise ArgumentError, "Don't know how to handle this input." unless arg.is_a? Numeric
         raise ValueOutOfBounds, "Number out of range: #{arg}" if arg > Constant::INT_MAX or arg < Constant::INT_MIN
         real_size = type.sub_type.to_i
@@ -149,6 +141,7 @@ module Eth
 
       # Properly encodes unsigned fixed-point numbers.
       def ufixed(arg, type)
+        arg = coerce_number arg
         raise ArgumentError, "Don't know how to handle this input." unless arg.is_a? Numeric
         high, low = type.sub_type.split("x").map(&:to_i)
         raise ValueOutOfBounds, arg unless arg >= 0 and arg < 2 ** high
@@ -157,6 +150,7 @@ module Eth
 
       # Properly encodes signed fixed-point numbers.
       def fixed(arg, type)
+        arg = coerce_number arg
         raise ArgumentError, "Don't know how to handle this input." unless arg.is_a? Numeric
         high, low = type.sub_type.split("x").map(&:to_i)
         raise ValueOutOfBounds, arg unless arg >= -2 ** (high - 1) and arg < 2 ** (high - 1)
@@ -186,8 +180,11 @@ module Eth
 
       # Properly encodes tuples.
       def tuple(arg, type)
-        raise EncodingError, "Expecting Hash: #{arg}" unless arg.instance_of? Hash
+        unless arg.is_a?(Hash) || arg.is_a?(Array)
+          raise EncodingError, "Expecting Hash or Array: #{arg}"
+        end
         raise EncodingError, "Expecting #{type.components.size} elements: #{arg}" unless arg.size == type.components.size
+        arg = arg.transform_keys(&:to_s) if arg.is_a?(Hash) # because component_type.name is String
 
         static_size = 0
         type.components.each_with_index do |component, i|
@@ -210,11 +207,18 @@ module Eth
             dynamic_values << dynamic_value
             dynamic_offset += dynamic_value.size
           else
-            offsets_and_static_values << type(component_type, arg.is_a?(Array) ? arg[i] : arg[component_type.name])
+            offsets_and_static_values << type(component_type, arg.is_a?(Array) ? arg[i] : arg.fetch(component_type.name))
           end
         end
 
         offsets_and_static_values.join + dynamic_values.join
+      end
+
+      def coerce_number(arg)
+        return arg if arg.is_a? Numeric
+        return arg.to_i(0) if arg.is_a?(String) && arg.match?(/^-?(0x)?[0-9a-fA-F]+$/)
+        return BigDecimal(arg) if arg.is_a?(String) && arg.match?(/^-?\d+(\.\d+)?$/)
+        arg
       end
 
       # Properly encode struct offsets.

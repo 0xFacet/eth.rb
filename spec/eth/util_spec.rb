@@ -80,6 +80,11 @@ describe Util do
       expect { Util.hex_to_bin "\x00\x00" }.to raise_error TypeError
       expect { Util.hex_to_bin 1234 }.to raise_error TypeError
     end
+
+    it "can convert back and forth" do
+      expect(Util.bin_to_hex Util.hex_to_bin "a").to eq "0a"
+      expect(Util.hex_to_bin Util.bin_to_hex "a").to eq "a"
+    end
   end
 
   describe ".prefix_hex .remove_hex_prefix" do
@@ -97,6 +102,11 @@ describe Util do
       expect(Util.prefix_hex "0123").to eq "0x0123"
       expect(Util.remove_hex_prefix "0x0123").to eq "0123"
     end
+
+    it "handles upper-case 0X prefixes" do
+      expect(Util.prefix_hex "0Xabc").to eq "0xabc"
+      expect(Util.remove_hex_prefix "0Xabc").to eq "abc"
+    end
   end
 
   describe ".hex .prefixed" do
@@ -108,6 +118,7 @@ describe Util do
 
       # Ensure we can detect hexa-decimal prefixes.
       expect(Util.prefixed? "0x94ead6c8ca752be9383610ee078961").to be_truthy
+      expect(Util.prefixed? "0X94ead6c8ca752be9383610ee078961").to be_truthy
       expect(Util.prefixed? "563df9c4690a3be20b5abc9c6705c4c7").to be_falsy
 
       # Ensure we can add and remove prefixes.
@@ -138,6 +149,11 @@ describe Util do
       int.zip(bytes).each do |i, b|
         expect(Util.int_to_big_endian i).to eq b
       end
+    end
+
+    it "converts hex strings to big endian" do
+      expect(Util.int_to_big_endian("0x10")).to eq "\x10"
+      expect(Util.int_to_big_endian("10")).to eq "\x10"
     end
 
     it "can raises if integers are invalid" do
@@ -173,6 +189,20 @@ describe Util do
 
       int.zip(bytes).each do |i, b|
         expect(Util.big_endian_to_int b).to eq i
+      end
+    end
+  end
+
+  describe ".deserialize_rlp_int" do
+    it "raises on non-minimal encodings" do
+      expect { Util.deserialize_rlp_int "\x00" }.to raise_error Rlp::DeserializationError
+      expect { Util.deserialize_rlp_int "\x00\x01" }.to raise_error Rlp::DeserializationError
+    end
+
+    it "round-trips valid integers" do
+      [0, 1, 256].each do |n|
+        encoded = Util.serialize_int_to_big_endian n
+        expect(Util.deserialize_rlp_int encoded).to eq n
       end
     end
   end

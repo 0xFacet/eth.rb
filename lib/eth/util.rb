@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# -*- encoding : ascii-8bit -*-
 
 require "digest/keccak"
 
@@ -48,7 +50,7 @@ module Eth
     # @raise [TypeError] if value is not a string.
     def bin_to_hex(bin)
       raise TypeError, "Value must be an instance of String" unless bin.instance_of? String
-      bin.unpack("H*").first
+      hex = bin.unpack("H*").first
     end
 
     # Packs a hexa-decimal string into a binary string. Also works with
@@ -61,7 +63,8 @@ module Eth
       raise TypeError, "Value must be an instance of String" unless hex.instance_of? String
       hex = remove_hex_prefix hex
       raise TypeError, "Non-hexadecimal digit found" unless hex? hex
-      [hex].pack("H*")
+      hex = "0#{hex}" if hex.size % 2 != 0
+      bin = [hex].pack("H*")
     end
 
     # Prefixes a hexa-decimal string with `0x`.
@@ -69,8 +72,7 @@ module Eth
     # @param hex [String] a hex-string to be prefixed.
     # @return [String] a prefixed hex-string.
     def prefix_hex(hex)
-      return hex if prefixed? hex
-      return "0x#{hex}"
+      "0x#{remove_hex_prefix hex}"
     end
 
     # Removes the `0x` prefix of a hexa-decimal string.
@@ -90,12 +92,12 @@ module Eth
       prefix_hex bin_to_hex bin
     end
 
-    # Checks if a string is hex-adecimal.
+    # Checks if a string is hexadecimal.
     #
     # @param str [String] a string to be checked.
-    # @return [String] a match if true; `nil` if not.
+    # @return [MatchData, nil] a match if true; `nil` if not.
     def hex?(str)
-      return false unless str.is_a? String
+      return unless str.is_a? String
       str = remove_hex_prefix str
       str.match /\A[0-9a-fA-F]*\z/
     end
@@ -105,7 +107,7 @@ module Eth
     # @param hex [String] a string to be checked.
     # @return [String] a match if true; `nil` if not.
     def prefixed?(hex)
-      hex.match /\A0x/
+      hex.match /\A0x/i
     end
 
     # Serializes an unsigned integer to big endian.
@@ -126,7 +128,11 @@ module Eth
     # @param num [Integer] integer to be converted.
     # @return [String] packed, big-endian integer string.
     def int_to_big_endian(num)
-      hex = num.to_s(16) unless hex? num
+      hex = if hex? num
+          remove_hex_prefix num
+        else
+          num.to_s(16)
+        end
       hex = "0#{hex}" if hex.size.odd?
       hex_to_bin hex
     end
@@ -137,6 +143,15 @@ module Eth
     # @return [Integer] an deserialized unsigned integer.
     def deserialize_big_endian_to_int(str)
       Rlp::Sedes.big_endian_int.deserialize str.sub(/\A(\x00)+/, "")
+    end
+
+    # Deserializes an RLP integer, enforcing minimal encoding.
+    #
+    # @param str [String] serialized big endian integer string.
+    # @return [Integer] a deserialized unsigned integer.
+    # @raise [Rlp::DeserializationError] if encoding is not minimal.
+    def deserialize_rlp_int(str)
+      Rlp::Sedes.big_endian_int.deserialize str
     end
 
     # Converts a big endian to an interger.

@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +52,27 @@ module Eth
     # @return [String] encoded function signature string.
     def self.encoded_function_signature(signature)
       Util.bin_to_hex Util.keccak256(signature)[0..3]
+    end
+
+    # Encodes a function call arguments
+    #
+    # @param args [Array] function arguments
+    # @return [String] encoded function call data
+    def encode_call(*args)
+      types = inputs.map(&:parsed_type)
+      encoded_str = Util.bin_to_hex(Eth::Abi.encode(types, args))
+      Util.prefix_hex(signature + (encoded_str.empty? ? "0" * 64 : encoded_str))
+    end
+
+    # Decodes a function call result
+    #
+    # @param data [String] eth_call result in hex format
+    # @return [Array]
+    def decode_call_result(data)
+      return nil if data == "0x"
+
+      types = outputs.map(&:parsed_type)
+      Eth::Abi.decode(types, data)
     end
   end
 end

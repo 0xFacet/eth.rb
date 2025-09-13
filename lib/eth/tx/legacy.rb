@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ module Eth
       # @option params [Integer] :gas_price the gas price.
       # @option params [Integer] :gas_limit the gas limit.
       # @option params [Eth::Address] :from the sender address.
-      # @option params [Eth::Address] :to the reciever address.
+      # @option params [Eth::Address] :to the receiver address.
       # @option params [Integer] :value the transaction value.
       # @option params [String] :data the transaction data payload.
       # @param chain_id [Integer] the EIP-155 Chain ID.
@@ -128,18 +128,18 @@ module Eth
         raise ParameterError, "Transaction missing fields!" if tx.size < 9
 
         # populate the 9 fields
-        nonce = Util.deserialize_big_endian_to_int tx[0]
-        gas_price = Util.deserialize_big_endian_to_int tx[1]
-        gas_limit = Util.deserialize_big_endian_to_int tx[2]
+        nonce = Util.deserialize_rlp_int tx[0]
+        gas_price = Util.deserialize_rlp_int tx[1]
+        gas_limit = Util.deserialize_rlp_int tx[2]
         to = Util.bin_to_hex tx[3]
-        value = Util.deserialize_big_endian_to_int tx[4]
+        value = Util.deserialize_rlp_int tx[4]
         data = tx[5]
         v = Util.bin_to_hex tx[6]
         r = Util.bin_to_hex tx[7]
         s = Util.bin_to_hex tx[8]
 
         # try to recover the chain id from v
-        chain_id = Chain.to_chain_id Util.deserialize_big_endian_to_int tx[6]
+        chain_id = Chain.to_chain_id Util.deserialize_rlp_int tx[6]
 
         # populate class attributes
         @signer_nonce = nonce.to_i
@@ -220,6 +220,30 @@ module Eth
         @signature_v = v
         @signature_r = r
         @signature_s = s
+        return hash
+      end
+
+      # Signs the transaction with a provided signature blob.
+      #
+      # @param signature [String] the concatenated `r`, `s`, and `v` values.
+      # @return [String] a transaction hash.
+      # @raise [Signature::SignatureError] if transaction is already signed.
+      # @raise [Signature::SignatureError] if sender address does not match signer.
+      def sign_with(signature)
+        if Tx.signed? self
+          raise Signature::SignatureError, "Transaction is already signed!"
+        end
+
+        # ensure the sender address matches the signature
+        unless @sender.nil? or sender.empty?
+          public_key = Signature.recover(unsigned_hash, signature, @chain_id)
+          signer_address = Tx.sanitize_address Util.public_key_to_address(public_key).to_s
+          from_address = Tx.sanitize_address @sender
+          raise Signature::SignatureError, "Signer does not match sender" unless signer_address == from_address
+        end
+
+        r, s, v = Signature.dissect signature
+        send :_set_signature, v, r, s
         return hash
       end
 

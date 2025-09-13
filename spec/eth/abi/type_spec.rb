@@ -28,7 +28,6 @@ describe Abi::Type do
       expect { Abi::Type.parse "bool8" }.to raise_error Abi::Type::ParseError
       expect { Abi::Type.parse "decimal" }.to raise_error Abi::Type::ParseError
 
-      expect { Abi::Type.parse "int" }.to raise_error Abi::Type::ParseError
       expect { Abi::Type.parse "int2" }.to raise_error Abi::Type::ParseError
       expect { Abi::Type.parse "int20" }.to raise_error Abi::Type::ParseError
       expect { Abi::Type.parse "int512" }.to raise_error Abi::Type::ParseError
@@ -83,6 +82,7 @@ describe Abi::Type do
       expect(Abi::Type.parse("bytes").size).to be_nil
       expect(Abi::Type.parse("uint256[]").size).to be_nil
       expect(Abi::Type.parse("uint256[4][]").size).to be_nil
+      expect(Abi::Type.parse("tuple").size).to be_nil
 
       expect(Abi::Type.parse("bytes32").size).to eq 32
       expect(Abi::Type.parse("uint256").size).to eq 32
@@ -183,6 +183,25 @@ describe Abi::Type do
           "type" => "tuple",
         },
       ]).to_s).to eq("(string,string,(uint256,string,(string,bytes))[],uint256,string[],bytes[10],(string,bytes))")
+    end
+  end
+
+  describe "inline tuple parsing helpers" do
+    it "extracts nested tuples" do
+      t = Abi::Type.new("tuple", "", [])
+      inner, rest = t.send(:extract_tuple, "tuple(uint256,(string,bytes))[3]")
+      expect(inner).to eq("uint256,(string,bytes)")
+      expect(rest).to eq("[3]")
+    end
+
+    it "splits nested tuple types" do
+      t = Abi::Type.new("tuple", "", [])
+      result = t.send(:split_tuple_types, "uint256,(string,bytes),address")
+      expect(result).to eq(["uint256", "(string,bytes)", "address"])
+    end
+
+    it "parses inline tuples with nesting" do
+      expect { Abi::Type.parse("tuple(uint256,tuple(string,bytes),address)") }.not_to raise_error
     end
   end
 end

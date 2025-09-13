@@ -1,6 +1,77 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+## [0.5.15]
+### Added
+* Implement EIP712 array encoding [#361](https://github.com/q9f/eth.rb/pull/361)
+* Support nested dynamic arrays in ABI [#356](https://github.com/q9f/eth.rb/pull/356)
+* Allow signing transactions with external signatures [#349](https://github.com/q9f/eth.rb/pull/349)
+* Feat: add eip-4844 transactions [#345](https://github.com/q9f/eth.rb/pull/345)
+* Support Solidity custom errors per ERC-6093 [#344](https://github.com/q9f/eth.rb/pull/344)
+* Allow to use chains with id > 4294967295 [#337](https://github.com/q9f/eth.rb/pull/337)
+
+### Changed
+* Harden ABI type parsing [#358](https://github.com/q9f/eth.rb/pull/358)
+* Ensure ABI decoder rejects ZST offsets [#359](https://github.com/q9f/eth.rb/pull/359)
+* Test: decode eip4844 blobs [#360](https://github.com/q9f/eth.rb/pull/360)
+* Abi: decode transaction input [#354](https://github.com/q9f/eth.rb/pull/354)
+* Fix tuple output decoding for contract calls [#353](https://github.com/q9f/eth.rb/pull/353)
+* Add comprehensive Tx module tests [#352](https://github.com/q9f/eth.rb/pull/352)
+* Move error decoding to contract module [#350](https://github.com/q9f/eth.rb/pull/350)
+* Enforce minimal RLP integer decoding [#351](https://github.com/q9f/eth.rb/pull/351)
+* Fix tuple size calculation without components [#348](https://github.com/q9f/eth.rb/pull/348)
+* Docs: update readme [#347](https://github.com/q9f/eth.rb/pull/347)
+* Chore: update development dependencies [#346](https://github.com/q9f/eth.rb/pull/346)
+* Handle hex string inputs in big-endian conversion [#343](https://github.com/q9f/eth.rb/pull/343)
+* Handle uppercase hex prefixes [#339](https://github.com/q9f/eth.rb/pull/339)
+* Add methods to encode function call and decode its result [#334](https://github.com/q9f/eth.rb/pull/334)
+* Docs(util): fix hex? return type [#342](https://github.com/q9f/eth.rb/pull/342)
+* Handle hex input consistently in int_to_big_endian [#341](https://github.com/q9f/eth.rb/pull/341)
+* Fix receiver option spelling [#340](https://github.com/q9f/eth.rb/pull/340)
+* Chore: bump version to 0.5.15 [#333](https://github.com/q9f/eth.rb/pull/333)
+
+## [0.5.14]
+### Added
+* Add ability to decode event parameters using ABI reference. [#328](https://github.com/q9f/eth.rb/pull/328)
+* Add support for EIP-7702 transactions  [#320](https://github.com/q9f/eth.rb/pull/320)
+* Eth/abi: implement packed encoder [#310](https://github.com/q9f/eth.rb/pull/310)
+
+### Changed
+* Chore: run rufo, add docs [#332](https://github.com/q9f/eth.rb/pull/332)
+* Spec/client: fix nonce too low error handling in spec [#331](https://github.com/q9f/eth.rb/pull/331)
+* Move the tests that are failing due to a geth upgrade to pending  [#330](https://github.com/q9f/eth.rb/pull/330)
+* Spec/client: don't require any rpc api token for tests [#326](https://github.com/q9f/eth.rb/pull/326)
+* Build(deps): bump JamesIves/github-pages-deploy-action from 4.7.2 to 4.7.3 [#327](https://github.com/q9f/eth.rb/pull/327)
+* Eth/eip712: prepare tests for packed encoding [#216](https://github.com/q9f/eth.rb/pull/216)
+* Spec/solidity: mute system call output [#319](https://github.com/q9f/eth.rb/pull/319)
+* Updated nesting of describe blocks in the EIP-1559 spec. [#318](https://github.com/q9f/eth.rb/pull/318)
+* Update README.md [#317](https://github.com/q9f/eth.rb/pull/317)
+* Docs: update README.md [#314](https://github.com/q9f/eth.rb/pull/314)
+* Gem: update copyright headers [#312](https://github.com/q9f/eth.rb/pull/312)
+* Build(deps): bump JamesIves/github-pages-deploy-action from 4.7.1 to 4.7.2 [#309](https://github.com/q9f/eth.rb/pull/309)
+* Spec: switch from infura to drpc [#308](https://github.com/q9f/eth.rb/pull/308)
+* Ci: update ruby version [#307](https://github.com/q9f/eth.rb/pull/307)
+* Gem: bump version to 0.5.14 [#305](https://github.com/q9f/eth.rb/pull/305)
+* Docs: update changelog [#304](https://github.com/q9f/eth.rb/pull/304)
+
+## [0.5.13]
+### Changed
+* Eth/api: update to latest available go-ethereum apis [#301](https://github.com/q9f/eth.rb/pull/301)
+* Eth/chain: update ids [#300](https://github.com/q9f/eth.rb/pull/300)
+* Spec: update ethereum/tests fixtures [#303](https://github.com/q9f/eth.rb/pull/303)
+* Ci: fix codecov uploader [#302](https://github.com/q9f/eth.rb/pull/302)
+* Eth/tx: only enforce block gas limit on mainnet [#299](https://github.com/q9f/eth.rb/pull/299)
+* Eth/util: fix single-byte hex-string nibbles [#298](https://github.com/q9f/eth.rb/pull/298)
+* Eth/address: rename null address to zero address [#297](https://github.com/q9f/eth.rb/pull/297)
+* Eth/address: add support to check for the ethereum "null address" [#296](https://github.com/q9f/eth.rb/pull/296)
+* Build(deps): bump codecov/codecov-action from 4 to 5 [#295](https://github.com/q9f/eth.rb/pull/295)
+* Build(deps): bump JamesIves/github-pages-deploy-action [#294](https://github.com/q9f/eth.rb/pull/294)
+* Build(deps): bump JamesIves/github-pages-deploy-action [#288](https://github.com/q9f/eth.rb/pull/288)
+* Eth/client: always return hash even if transaction didn't succeed [#284](https://github.com/q9f/eth.rb/pull/284)
+* Eth/chain: update list of chains [#283](https://github.com/q9f/eth.rb/pull/283)
+* Fix undefined method `raise_error' for an instance of Eth::Tx::Eip1559 (NoMethodError) [#282](https://github.com/q9f/eth.rb/pull/282)
+* Gem: bump version to 0.5.13 [#281](https://github.com/q9f/eth.rb/pull/281)
+
 ## [0.5.12]
 ### Added
 * Allow to call JSON RPC with custom block number [#268](https://github.com/q9f/eth.rb/pull/268)
@@ -75,7 +146,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.5.9]
 ### Added
-* Eth/abi: dynamic struct encoding (#135) [#185](https://github.com/q9f/eth.rb/pull/185)
+* Eth/abi: dynamic struct encoding [#135](https://github.com/q9f/eth.rb/pull/135) [#185](https://github.com/q9f/eth.rb/pull/185)
 * Eth/client: support camel case (convert before sending the tx) [#172](https://github.com/q9f/eth.rb/pull/172)
 * Eth/client: add `tx_succeeded?` [#173](https://github.com/q9f/eth.rb/pull/173)
 

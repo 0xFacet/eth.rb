@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,10 @@ module Eth
         "#{name}(#{types.join(",")})"
       end
 
+      # Gets the input type for events.
+      #
+      # @param input [Hash] events input.
+      # @return [String] input type.
       def type(input)
         if input["type"] == "tuple"
           "(#{input["components"].map { |c| type(c) }.join(",")})"

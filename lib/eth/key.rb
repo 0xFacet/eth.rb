@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ module Eth
       signature = compact.bytes
       v = Chain.to_v recovery_id, chain_id
       leading_zero = true
-      [v].pack("N").unpack("C*").each do |byte|
+      [v].pack("Q>").unpack("C*").each do |byte|
         leading_zero = false if byte > 0 and leading_zero
         signature.append byte unless leading_zero and byte === 0
       end

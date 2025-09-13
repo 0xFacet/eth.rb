@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ module Eth
       # @option params [Integer] :max_gas_fee the max transaction fee per gas.
       # @option params [Integer] :gas_limit the gas limit.
       # @option params [Eth::Address] :from the sender address.
-      # @option params [Eth::Address] :to the reciever address.
+      # @option params [Eth::Address] :to the receiver address.
       # @option params [Integer] :value the transaction value.
       # @option params [String] :data the transaction data payload.
       # @option params [Array] :access_list an optional access list.
@@ -148,13 +148,13 @@ module Eth
         raise ParameterError, "Transaction missing fields!" if tx.size < 9
 
         # populate the 9 payload fields
-        chain_id = Util.deserialize_big_endian_to_int tx[0]
-        nonce = Util.deserialize_big_endian_to_int tx[1]
-        priority_fee = Util.deserialize_big_endian_to_int tx[2]
-        max_gas_fee = Util.deserialize_big_endian_to_int tx[3]
-        gas_limit = Util.deserialize_big_endian_to_int tx[4]
+        chain_id = Util.deserialize_rlp_int tx[0]
+        nonce = Util.deserialize_rlp_int tx[1]
+        priority_fee = Util.deserialize_rlp_int tx[2]
+        max_gas_fee = Util.deserialize_rlp_int tx[3]
+        gas_limit = Util.deserialize_rlp_int tx[4]
         to = Util.bin_to_hex tx[5]
-        value = Util.deserialize_big_endian_to_int tx[6]
+        value = Util.deserialize_rlp_int tx[6]
         data = tx[7]
         access_list = tx[8]
 
@@ -254,6 +254,31 @@ module Eth
         @signature_y_parity = recovery_id
         @signature_r = r
         @signature_s = s
+        return hash
+      end
+
+      # Signs the transaction with a provided signature blob.
+      #
+      # @param signature [String] the concatenated `r`, `s`, and `v` values.
+      # @return [String] a transaction hash.
+      # @raise [Signature::SignatureError] if transaction is already signed.
+      # @raise [Signature::SignatureError] if sender address does not match signer.
+      def sign_with(signature)
+        if Tx.signed? self
+          raise Signature::SignatureError, "Transaction is already signed!"
+        end
+
+        # ensure the sender address matches the signature
+        unless @sender.nil? or sender.empty?
+          public_key = Signature.recover(unsigned_hash, signature, @chain_id)
+          signer_address = Tx.sanitize_address Util.public_key_to_address(public_key).to_s
+          from_address = Tx.sanitize_address @sender
+          raise Signature::SignatureError, "Signer does not match sender" unless signer_address == from_address
+        end
+
+        r, s, v = Signature.dissect signature
+        recovery_id = Chain.to_recovery_id v.to_i(16), @chain_id
+        send :_set_signature, recovery_id, r, s
         return hash
       end
 

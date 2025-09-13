@@ -10,9 +10,7 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/q9f/eth.rb)](https://github.com/q9f/eth.rb/releases)
 [![Gem](https://img.shields.io/gem/v/eth)](https://rubygems.org/gems/eth)
 [![Gem](https://img.shields.io/gem/dt/eth)](https://rubygems.org/gems/eth)
-[![Visitors](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fq9f%2Feth.rb&count_bg=%2379C83D&title_bg=%23555555&icon=rubygems.svg&icon_color=%23FF0000&title=visitors&edge_flat=false)](https://hits.seeyoufarm.com)
 [![codecov](https://codecov.io/gh/q9f/eth.rb/branch/main/graph/badge.svg?token=IK7USBPBZY)](https://codecov.io/gh/q9f/eth.rb)
-[![Maintainability](https://api.codeclimate.com/v1/badges/469e6f66425198ad7614/maintainability)](https://codeclimate.com/github/q9f/eth.rb/maintainability)
 [![Top Language](https://img.shields.io/github/languages/top/q9f/eth.rb?color=red)](https://github.com/q9f/eth.rb/pulse)
 [![Yard Doc API](https://img.shields.io/badge/documentation-API-blue)](https://q9f.github.io/eth.rb)
 [![Usage Wiki](https://img.shields.io/badge/usage-WIKI-blue)](https://github.com/q9f/eth.rb/wiki)
@@ -34,11 +32,15 @@ What you get:
 - [x] EIP-2028 Call-data intrinsic gas cost estimates (plus access lists)
 - [x] EIP-2718 Ethereum Transaction Envelopes (and types)
 - [x] EIP-2930 Ethereum Type-1 Transactions (with access lists)
+- [x] EIP-4844 Ethereum Type-3 Transactions (with shard blobs)
+- [x] EIP-7702 Ethereum Type-4 Transactions (with authorization lists)
 - [x] ABI-Encoder and Decoder (including type parser)
+- [x] Packed ABI-Encoder for Solidity smart contracts
 - [x] RLP-Encoder and Decoder (including sedes)
 - [x] RPC-Client (IPC/HTTP) for Execution-Layer APIs
 - [x] Solidity bindings (compile contracts from Ruby)
 - [x] Full smart-contract support (deploy, transact, and call)
+- [x] ERC-6093 custom Solidity errors
 
 ## Installation
 Add this line to your application's Gemfile:
@@ -80,8 +82,6 @@ The test suite expects working local HTTP and IPC endpoints with a prefunded dev
 geth --dev --http --ipcpath /tmp/geth.ipc &
 ```
 
-It also expects an `$INFURA_TOKEN` in environment to test some ENS queries on mainnet.
-
 To run tests, simply use `rspec`. Note, that the Ethereum test fixtures are also required.
 
 ```shell
@@ -90,12 +90,12 @@ bundle install
 rspec
 ```
 
-The goal is to have 100% specification coverage for all code inside this gem.
+The goal is to have 100% unit-test coverage for all code inside this gem.
 
 ## Contributing
 Pull requests are welcome! To contribute, please consider the following:
 * Code should be fully documented. Run `yard doc` and make sure it does not yield any warnings or undocumented sets.
-* Code should be fully covered by tests. Run `rspec` to make sure all tests pass. The CI has an integration that will assis you to identify uncovered lines of code and get coverage up to 100%.
+* Code should be fully covered by tests. Run `rspec` to make sure all tests pass. The CI has an integration that will assist you to identify uncovered lines of code and get coverage up to 100%.
 * Code should be formatted properly. Try to eliminate the most common issues such as trailing white-spaces or duplicate new-lines. Usage of the `rufo` gem is recommended.
 * Submit pull requests, questions, or issues to Github: <https://github.com/q9f/eth.rb>
 

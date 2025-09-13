@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "net/http"
+require "uri"
+require "httpx"
 
 # Provides the {Eth} module.
 module Eth
@@ -49,10 +50,15 @@ module Eth
       if !(uri.user.nil? && uri.password.nil?)
         @user = uri.user
         @password = uri.password
-        @uri = URI("#{uri.scheme}://#{uri.user}:#{uri.password}@#{@host}:#{@port}#{uri.path}")
+        if uri.query
+          @uri = URI("#{uri.scheme}://#{uri.user}:#{uri.password}@#{@host}:#{@port}#{uri.path}?#{uri.query}")
+        else
+          @uri = URI("#{uri.scheme}://#{uri.user}:#{uri.password}@#{@host}:#{@port}#{uri.path}")
+        end
       else
-        @uri = URI("#{uri.scheme}://#{@host}:#{@port}#{uri.path}")
+        @uri = uri
       end
+      @client = HTTPX.plugin(:persistent).with(headers: { "Content-Type" => "application/json" })
     end
 
     # Sends an RPC request to the connected HTTP client.
@@ -60,13 +66,8 @@ module Eth
     # @param payload [Hash] the RPC request parameters.
     # @return [String] a JSON-encoded response.
     def send_request(payload)
-      http = Net::HTTP.new(@host, @port)
-      http.use_ssl = @ssl
-      header = { "Content-Type" => "application/json" }
-      request = Net::HTTP::Post.new(@uri, header)
-      request.body = payload
-      response = http.request(request)
-      response.body
+      response = @client.post(@uri, body: payload)
+      response.body.to_s
     end
   end
 

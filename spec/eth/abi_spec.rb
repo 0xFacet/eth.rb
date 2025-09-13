@@ -9,6 +9,10 @@ describe Abi do
     let(:basic_abi_tests_file) { File.read "spec/fixtures/ethereum/tests/ABITests/basic_abi_tests.json" }
     subject(:basic_abi_tests) { JSON.parse basic_abi_tests_file }
 
+    # load ethers.js abi test cases
+    let(:ethers_abi_tests_file) { File.read "spec/fixtures/abi/ethers.json" }
+    subject(:ethers_abi_tests) { JSON.parse ethers_abi_tests_file }
+
     describe "dynamic encode" do
       it "can encode array of string" do
         encoded = Util.bin_to_hex(described_class.encode(["string[]"], [["hello", "world"]]))
@@ -124,6 +128,50 @@ describe Abi do
       bytes = "\x00" * 32 * 3
       expect(Abi.encode(["address[]"], [["\x00" * 20] * 3])).to eq "#{Util.zpad_int(32)}#{Util.zpad_int(3)}#{bytes}"
       expect(Abi.encode(["uint16[2]"], [[5, 6]])).to eq "#{Util.zpad_int(5)}#{Util.zpad_int(6)}"
+    end
+
+    it "passes ethersjs test cases" do
+      pending("https://github.com/q9f/eth.rb/issues/372")
+      normalize = lambda do |val, type|
+        t = Eth::Abi::Type.parse(type)
+        if t.dimensions.any?
+          val.map { |v| normalize.call(v, t.nested_sub) }
+        elsif t.base_type == "tuple"
+          val.zip(t.components).map { |v, comp| normalize.call(v, comp) }
+        elsif %w[uint int].include?(t.base_type)
+          val.is_a?(String) ? Integer(val) : val
+        elsif %w[ureal real fixed ufixed].include?(t.base_type)
+          val.is_a?(String) ? val.to_f : val
+        elsif t.base_type == "address"
+          val.is_a?(String) ? val.downcase : val
+        elsif t.base_type == "bytes"
+          if val.is_a?(String)
+            if Util.prefixed?(val) || (!t.sub_type.empty? && val.size == t.sub_type.to_i * 2 && Util.hex?(val))
+              Util.hex_to_bin(val)
+            else
+              val.codepoints.pack("C*")
+            end
+          else
+            val
+          end
+        elsif t.base_type == "string"
+          val.is_a?(String) ? val.force_encoding(Encoding::UTF_8) : val
+        else
+          val
+        end
+      end
+
+      ethers_abi_tests.each do |test|
+        types = test["type"]
+        args = normalize.call(test["value"], types)
+        result = test["encoded"]
+        encoded = Abi.encode [types], [args]
+        expect(Util.prefix_hex(Util.bin_to_hex encoded)).to eq result
+        expect(encoded).to eq Util.hex_to_bin result
+        decoded = Abi.decode([types], result).first
+        decoded = normalize.call(decoded, types)
+        expect(decoded).to eq args
+      end
     end
 
     it "can decode abi" do
@@ -351,7 +399,6 @@ describe Abi do
       types = ["uint256[][]", "string[]"]
       args = [[[1, 2], [3]], ["one", "two", "three"]]
       data = Util.hex_to_bin "000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000036f6e650000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000374776f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057468726565000000000000000000000000000000000000000000000000000000"
-      pending("https://github.com/q9f/eth.rb/issues/217")
       assert(data, types, args)
     end
 
@@ -378,14 +425,20 @@ describe Abi do
       types = ["uint256", "(uint256,string)"]
       args = [1234, [5678, "Hello World"]]
       data = Util.hex_to_bin "00000000000000000000000000000000000000000000000000000000000004d20000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000162e0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b48656c6c6f20576f726c64000000000000000000000000000000000000000000"
-      pending("https://github.com/q9f/eth.rb/issues/102")
       assert(data, types, args)
 
       types = ["uint256", "(address,uint256)[]", "string"]
-      args = [66, [["18a475d6741215709ed6cc5f4d064732379b5a58", 1]], "QmWBiSE9ByR6vrx4hvrjqS3SG5r6wE4SRq7CP2RVpafZWV"]
+      args = [66, [["0x18a475d6741215709ed6cc5f4d064732379b5a58", 1]], "QmWBiSE9ByR6vrx4hvrjqS3SG5r6wE4SRq7CP2RVpafZWV"]
       data = Util.hex_to_bin "0000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000018a475d6741215709ed6cc5f4d064732379b5a580000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002e516d57426953453942795236767278346876726a71533353473572367745345352713743503252567061665a5756000000000000000000000000000000000000"
-      pending("https://github.com/q9f/eth.rb/issues/102")
       assert(data, types, args)
+    end
+
+    it "decodes mixed types from prefixed hex data" do
+      types = ["uint256", "(address,uint256)[]", "string"]
+      args = [66, [["0x18a475d6741215709ed6cc5f4d064732379b5a58", 1]], "QmWBiSE9ByR6vrx4hvrjqS3SG5r6wE4SRq7CP2RVpafZWV"]
+      data = "0x0000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000018a475d6741215709ed6cc5f4d064732379b5a580000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002e516d57426953453942795236767278346876726a71533353473572367745345352713743503252567061665a5756000000000000000000000000000000000000"
+      decoded = Abi.decode(types, data)
+      expect(decoded).to eq args
     end
   end
 

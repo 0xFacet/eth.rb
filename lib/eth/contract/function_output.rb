@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 The Ruby-Eth Contributors
+# Copyright (c) 2016-2025 The Ruby-Eth Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,19 +19,27 @@ module Eth
 
   # Provide classes for contract function output.
   class Contract::FunctionOutput
-    attr_accessor :type, :name
+    attr_accessor :type, :raw_type, :name
 
     # Constructor of the {Eth::Contract::FunctionOutput} class.
     #
     # @param data [Hash] contract abi data.
     def initialize(data)
-      @type = Eth::Abi::Type.parse(data["type"])
+      @raw_type = data["type"]
+      @type = Eth::Abi::Type.parse(data["type"], data["components"])
       @name = data["name"]
     end
 
     # Returns complete types with subtypes, e.g., `uint256`.
     def type
-      @type.base_type + @type.sub_type + @type.dimensions.map { |dimension| "[#{dimension > 0 ? dimension : ""}]" }.join("")
+      @type.base_type +
+        @type.sub_type +
+        @type.dimensions.map { |dimension| "[#{dimension > 0 ? dimension : ""}]" }.join("")
+    end
+
+    # Returns parsed types.
+    def parsed_type
+      @type
     end
   end
 end

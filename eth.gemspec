@@ -34,6 +34,9 @@ Gem::Specification.new do |spec|
   spec.platform = Gem::Platform::RUBY
   spec.required_ruby_version = ">= 3.0", "< 4.0"
 
+  # bigdecimal for big decimals ;)
+  spec.add_dependency "bigdecimal", "~> 3.1"
+
   # forwardable for contracts meta programming
   spec.add_dependency "forwardable", "~> 1.3"
 
@@ -47,8 +50,14 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rbsecp256k1", "~> 6.0"
 
   # openssl for encrypted key derivation
-  spec.add_dependency "openssl", ">= 2.2", "< 4.0"
+  spec.add_dependency "openssl", "~> 3.3"
 
   # scrypt for encrypted key derivation
   spec.add_dependency "scrypt", "~> 3.0"
+
+  # bls12-381 for BLS signatures and pairings
+  spec.add_dependency "bls12-381", "~> 0.3"
+
+  # httpx for HTTP/2 and persistent connections
+  spec.add_dependency "httpx", "~> 1.6"
 end

@@ -92,6 +92,41 @@ describe Tx::Legacy do
       expect(ruby.hex).to eq duplicated.hex
       expect(ruby.hash).to eq duplicated.hash
     end
+
+    it "raises on non-minimal integer encoding" do
+      fields = [
+        "\x00\x01", # nonce with leading zero
+        Util.serialize_int_to_big_endian(1),
+        Util.serialize_int_to_big_endian(1),
+        "",
+        Util.serialize_int_to_big_endian(1),
+        "",
+        Util.serialize_int_to_big_endian(1),
+        "",
+        "",
+      ]
+      encoded = Rlp.encode(fields)
+      hex = Util.bin_to_hex(encoded)
+      expect { Tx::Legacy.decode(hex) }.to raise_error Rlp::DeserializationError
+    end
+
+    it "round-trips valid integer encoding" do
+      fields = [
+        Util.serialize_int_to_big_endian(1),
+        Util.serialize_int_to_big_endian(1),
+        Util.serialize_int_to_big_endian(1),
+        "",
+        Util.serialize_int_to_big_endian(1),
+        "",
+        Util.serialize_int_to_big_endian(1),
+        "",
+        "",
+      ]
+      encoded = Rlp.encode(fields)
+      hex = Util.bin_to_hex(encoded)
+      tx = Tx::Legacy.decode(hex)
+      expect(tx.signer_nonce).to eq 1
+    end
   end
 
   describe ".initialize" do
@@ -128,8 +163,17 @@ describe Tx::Legacy do
           nonce: 0,
           gas_price: Unit::GWEI,
           gas_limit: Tx::BLOCK_GAS_LIMIT + 1,
+          chain_id: Chain::ETHEREUM,
         })
       }.to raise_error Tx::ParameterError, "Invalid gas limit 30000001!"
+      expect {
+        Tx.new({
+          nonce: 0,
+          gas_price: Unit::GWEI,
+          gas_limit: Tx::BLOCK_GAS_LIMIT + 1,
+          chain_id: Chain::OPTIMISM,
+        })
+      }.not_to raise_error # Block gas limit is only enforced in Ethereum mainnet
       expect {
         Tx.new({
           nonce: -1,
@@ -185,6 +229,34 @@ describe Tx::Legacy do
       expect {
         tx_from_cow.sign cow
       }.not_to raise_error
+    end
+  end
+
+  describe ".sign_with" do
+    it "signs with an external signature" do
+      signature = cow.sign(tx.unsigned_hash, tx.chain_id)
+      r, s, v = Signature.dissect(signature)
+      tx.sign_with(signature)
+      expect(tx.signature_v).to eq v
+      expect(tx.signature_r).to eq r
+      expect(tx.signature_s).to eq s
+    end
+
+    it "does not sign a transaction twice" do
+      signature = cow.sign(tx.unsigned_hash, tx.chain_id)
+      tx.sign_with(signature)
+      expect { tx.sign_with(signature) }.to raise_error Signature::SignatureError, "Transaction is already signed!"
+    end
+
+    it "checks for valid signer" do
+      tx_from_cow = Tx.new({
+        nonce: 0,
+        gas_price: Unit::WEI,
+        gas_limit: Tx::DEFAULT_GAS_LIMIT,
+        from: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+      })
+      signature = Key.new.sign(tx_from_cow.unsigned_hash, tx_from_cow.chain_id)
+      expect { tx_from_cow.sign_with(signature) }.to raise_error Signature::SignatureError, "Signer does not match sender"
     end
   end
 
