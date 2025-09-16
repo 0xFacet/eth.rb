@@ -55,25 +55,64 @@ module Eth
             end
           end
         elsif type.base_type == "tuple" && type.dimensions.empty?
-          offset = 0
-          result = []
+          # Decode tuple by first determining head positions for all components.
+          # For dynamic components, the head contains a 32-byte offset pointer
+          # into the tuple tail. The "next" boundary for a dynamic component is
+          # the next dynamic component's pointer (or the end of the tuple), not
+          # simply the next 32-byte head word, because static components inline
+          # their data in the head and may span multiple 32-byte words.
+
           raise DecodingError, "Cannot decode tuples without known components" if type.components.nil?
-          type.components.each_with_index do |c, i|
-            if c.dynamic?
-              pointer = Util.deserialize_big_endian_to_int arg[offset, 32]
-              next_offset = if i + 1 < type.components.size
-                  Util.deserialize_big_endian_to_int arg[offset + 32, 32]
-                else
-                  arg.size
-                end
-              raise DecodingError, "Offset out of bounds" if pointer > arg.size || next_offset > arg.size || next_offset < pointer
-              result << type(c, arg[pointer, next_offset - pointer])
-              offset += 32
+
+          # First pass: compute head offsets for each component and total head size.
+          head_offsets = []
+          head_pos = 0
+          type.components.each do |comp|
+            head_offsets << head_pos
+            if comp.dynamic?
+              head_pos += 32
             else
-              size = c.size
+              size = comp.size
+              head_pos += size
+            end
+          end
+          heads_size = head_pos
+
+          # Build dynamic component indices and their pointers.
+          dynamic_indices = []
+          dynamic_pointers = []
+          type.components.each_with_index do |comp, i|
+            next unless comp.dynamic?
+            dynamic_indices << i
+            ptr = Util.deserialize_big_endian_to_int(arg[head_offsets[i], 32])
+            # ABI guarantees dynamic pointers point into the tail (>= heads_size)
+            raise DecodingError, "Offset out of bounds" if ptr < heads_size || ptr > arg.size
+            dynamic_pointers << ptr
+          end
+          # Map component index -> dynamic index for O(1) lookup
+          dyn_index_map = {}
+          dynamic_indices.each_with_index { |ci, di| dyn_index_map[ci] = di }
+
+          # Second pass: decode each component using correct slicing.
+          result = []
+          type.components.each_with_index do |comp, i|
+            if comp.dynamic?
+              # Determine this component's pointer and next boundary.
+              idx_in_dynamic = dyn_index_map[i]
+              pointer = dynamic_pointers[idx_in_dynamic]
+              next_pointer = if idx_in_dynamic + 1 < dynamic_indices.length
+                dynamic_pointers[idx_in_dynamic + 1]
+              else
+                arg.size
+              end
+              raise DecodingError, "Offset out of bounds" if pointer > arg.size || next_pointer > arg.size || next_pointer < pointer
+              slice = arg[pointer, next_pointer - pointer]
+              result << type(comp, slice)
+            else
+              size = comp.size
+              offset = head_offsets[i]
               raise DecodingError, "Offset out of bounds" if offset + size > arg.size
-              result << type(c, arg[offset, size])
-              offset += size
+              result << type(comp, arg[offset, size])
             end
           end
           result
@@ -85,10 +124,14 @@ module Eth
             raise DecodingError, "Wrong data size for dynamic array" unless arg.size >= 32 + 32 * l
             offsets = (0...l).map do |i|
               off = Util.deserialize_big_endian_to_int arg[32 + 32 * i, 32]
-              raise DecodingError, "Offset out of bounds" if off < 32 * l || off > arg.size - 64
+              raise DecodingError, "Offset out of bounds" if off < 32 * l || off > arg.size - 32
               off
             end
-            offsets.map { |off| type(nested_sub, arg[32 + off..]) }
+            offsets.each_with_index.map do |off, i|
+              next_off = (i + 1 < offsets.length ? offsets[i + 1] : (arg.size - 32))
+              raise DecodingError, "Offset out of bounds" if next_off < off || next_off > arg.size - 32
+              type(nested_sub, arg[32 + off, next_off - off])
+            end
           else
             raise DecodingError, "Wrong data size for dynamic array" unless arg.size >= 32 + nested_sub.size * l
             # decoded dynamic-sized arrays with static sub-types
