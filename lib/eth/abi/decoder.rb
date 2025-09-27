@@ -47,11 +47,23 @@ module Eth
 
             # Decode each element of the array
             (1..l).map do |i|
-              pointer = Util.deserialize_big_endian_to_int arg[i * 32, 32] # Pointer to the size of the array's element
-              raise DecodingError, "Offset out of bounds" if pointer < 32 * l || pointer > arg.size - 64
-              data_l = Util.deserialize_big_endian_to_int arg[32 + pointer, 32] # length of the element
-              raise DecodingError, "Offset out of bounds" if pointer + 32 + Util.ceil32(data_l) > arg.size
-              type(Type.parse(type.base_type), arg[pointer + 32, Util.ceil32(data_l) + 32])
+              pointer = Util.deserialize_big_endian_to_int arg[i * 32, 32] # Pointer to the element
+              raise DecodingError, "Offset out of bounds" if pointer < 32 * l || pointer > arg.size - 32
+
+              # Find the size of this element
+              # For the last element, use remaining data. For others, use next pointer.
+              if i < l
+                next_pointer = Util.deserialize_big_endian_to_int arg[(i + 1) * 32, 32]
+                element_size = next_pointer - pointer
+              else
+                element_size = arg.size - 32 - pointer
+              end
+
+              raise DecodingError, "Invalid element size" if element_size < 0
+
+              # Decode the element recursively with one less dimension
+              # For string[][], the nested_sub would be string[]
+              type(type.nested_sub, arg[32 + pointer, element_size])
             end
           end
         elsif type.base_type == "tuple" && type.dimensions.empty?
